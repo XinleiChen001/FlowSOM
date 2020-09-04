@@ -41,14 +41,15 @@ BuildSOM <- function(fsom, colsToUse=NULL, silent=FALSE, ...){
     if(!"data" %in% names(fsom)){
         stop("Please run the ReadInput function first!")
     }
-    
+
     if(!silent) message("Building SOM\n")
     
     if(is.null(colsToUse)){
         colsToUse <- seq_len(ncol(fsom$data))
     }
-    
+  
     fsom$map <- SOM(fsom$data[, colsToUse],silent=silent, ...)
+    colnames(fsom$map$codes)<-as.character(all_markers[FlowSOM_id,]$markers)
     fsom$map$colsUsed <- colsToUse
     fsom <- UpdateDerivedValues(fsom)
     fsom
@@ -60,7 +61,8 @@ UpdateDerivedValues <- function(fsom){
       apply(subset(fsom$data, fsom$map$mapping[,1] == i),2,stats::median)
     }))
   fsom$map$medianValues[is.nan(fsom$map$medianValues)] <- NA 
-  colnames(fsom$map$medianValues) <- colnames(fsom$data)
+  #colnames(fsom$map$medianValues) <- colnames(fsom$data)
+  colnames(fsom$map$medianValues)<-as.character(all_markers[-nrow(all_markers),]$markers)
   
   fsom$map$cvValues <-
     t(sapply(seq_len(fsom$map$nNodes), function(i) {
@@ -74,14 +76,17 @@ UpdateDerivedValues <- function(fsom){
               }})
     }))
   fsom$map$cvValues[is.nan(fsom$map$cvValues)] <- NA 
-  colnames(fsom$map$medianValues) <- colnames(fsom$data)
+  #colnames(fsom$map$medianValues) <- colnames(fsom$data)
+  colnames( fsom$map$cvValues)<-as.character(all_markers[-nrow(all_markers),]$markers)
   
   fsom$map$sdValues <-
     t(sapply(seq_len(fsom$map$nNodes), function(i) {
       apply(subset(fsom$data, fsom$map$mapping[,1] == i),2,stats::sd)
     }))
   fsom$map$sdValues[is.nan(fsom$map$sdValues)] <- 0 
-  colnames(fsom$map$sdValues) <- colnames(fsom$data)
+  #colnames(fsom$map$sdValues) <- colnames(fsom$data)
+  colnames( fsom$map$sdValues)<-as.character(all_markers[-nrow(all_markers),]$markers)
+  
   
   return(fsom)
 }

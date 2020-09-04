@@ -57,11 +57,28 @@ ReadInput <- function(input, pattern=".fcs",
                         spillover=NULL,
                         transform=FALSE, 
                         toTransform=NULL, 
-                        transformFunction = flowCore::logicleTransform(),
+                        #transformFunction = flowCore::logicleTransform(),
+                        transformFunction=cytofAsinh,
                         scale=FALSE, 
                         scaled.center=TRUE, 
                         scaled.scale=TRUE, 
                         silent=FALSE){
+  
+  if(0){
+    input=file_name[1]
+    pattern=".fcs" 
+     compensate=FALSE 
+     spillover=NULL
+     transform=FALSE 
+     toTransform=NULL 
+     transformFunction = flowCore::logicleTransform()
+     scale=FALSE 
+     scaled.center=TRUE 
+     scaled.scale=TRUE 
+     silent=FALSE
+     toTransform=transform_id
+    
+  }
     
     fsom <- list(pattern=pattern, compensate=compensate, spillover=spillover,
                 transform=transform, toTransform=toTransform,
@@ -106,7 +123,7 @@ ReadInput <- function(input, pattern=".fcs",
                         flowFrame <- suppressWarnings(
                             flowCore::read.FCS(input[i]))
                     }
-                    fsom <- AddFlowFrame(fsom, flowFrame)
+                    fsom <- AddFlowFrame(fsom, flowFrame,transformFunction=transformFunction)
                 }
             }
         } else {
@@ -150,7 +167,11 @@ ReadInput <- function(input, pattern=".fcs",
 #' @return FlowSOM object with data added
 #'
 #' @seealso \code{\link{ReadInput}}
-AddFlowFrame <- function(fsom, flowFrame){
+AddFlowFrame <- function(fsom, flowFrame,transformFunction){
+
+
+  
+     
     # Compensation
     if(fsom$compensate){
         if(is.null(fsom$spillover)){
@@ -179,19 +200,37 @@ AddFlowFrame <- function(fsom, flowFrame){
         flowFrame <- flowCore::compensate(flowFrame, spillover)
     }
     
+  
+    # del Time and eventlength
+  
+  
+  
     # Transform
     if(fsom$transform){
-        if(is.null(fsom$toTransform)){ 
-            fsom$toTransform <- colnames(flowFrame@description$SPILL)
-        } else{ 
-            fsom$toTransform <- colnames(flowCore::exprs(flowFrame)[,
-                                                            fsom$toTransform])
-        }
-        flowFrame <- flowCore::transform(flowFrame, 
-            flowCore::transformList(fsom$toTransform,
-                                    fsom$transformFunction))
+        # if(is.null(fsom$toTransform)){ 
+        #     fsom$toTransform <- colnames(flowFrame@description$SPILL)
+        # } else{ 
+        #     fsom$toTransform <- colnames(flowCore::exprs(flowFrame)[,
+        #                                                     fsom$toTransform])
+        # }
+        # flowFrame2 <- flowCore::transform(flowFrame, 
+        #     flowCore::transformList(fsom$toTransform,
+        #                             fsom$transformFunction))
+      
+      expr<-flowFrame@exprs
+      expr_trans<-expr
+      expr_trans[, transform_id] <- apply(expr_trans[, transform_id,drop = FALSE],
+                                                         2,transformFunction)
+      params <- parameters(flowFrame)
+      pd <- pData(params)
+      keyval <- keyword(flowFrame)
+
+      flowFrame <- flowFrame(exprs = expr_trans, parameters = params, 
+                             description = keyval)
+      
     }
-    
+
+
     # Save pretty names for nicer visualisation later on
     if(is.null(fsom$prettyColnames)){
         n <- flowFrame@parameters@data[, "name"]
@@ -202,10 +241,15 @@ AddFlowFrame <- function(fsom, flowFrame){
             # antibody#fluorochrome -> antibody (fluorochrome)
             fsom$prettyColnames <- gsub("#(.*)$"," (\\1)",d)
         } else {
-            fsom$prettyColnames <- paste(d, " <", n, ">", sep="")
+            #fsom$prettyColnames <- paste(d, " <", n, ">", sep="")
+          fsom$prettyColnames <- d
+          fsom$prettyColnames<-as.character(all_markers[-nrow(all_markers),]$markers)
         }
         names(fsom$prettyColnames) <- colnames(flowCore::exprs(flowFrame))
     }
+  
+    
+  
   
     # Add the data to the matrix
     f <- flowCore::exprs(flowFrame)
