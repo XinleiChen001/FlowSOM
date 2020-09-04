@@ -21,8 +21,16 @@
 #' flowSOM.res <- BuildMST(flowSOM.res)
 #' 
 #' @export
-BuildMST <- function(fsom, silent=FALSE, tSNE=FALSE){
-
+BuildMST <- function(fsom, silent=FALSE, tSNE=FALSE,output_gexf=T){
+  
+  library(rgexf)
+  
+  if(0){
+    fsom<-fSOM
+    
+  }
+  library(igraph)
+  
     fsom$MST <- list()
     if(!silent) message("Building MST\n")
     
@@ -37,17 +45,79 @@ BuildMST <- function(fsom, silent=FALSE, tSNE=FALSE){
     igraph::edge.attributes(fsom$MST$graph)$weight <- ws
     fsom$MST$l <- igraph::layout.kamada.kawai(
       coords=as.matrix(fsom$map$grid),
-      fsom$MST$graph)
-
+      graph=fsom$MST$graph
+      )
+    if(output_gexf) {
+      message("Outputing mst.gexf\n")
+    
+      mst_gexf<-igraph.to.gexf(fsom$MST$graph)
+      write.gexf(mst_gexf,output="mst.gexf")}
     
     if(tSNE){
-        fsom$MST$l2 <- tsne(fsom$map$codes)   
+      
+      fsom$MST$l2 <- Rtsne(fsom$map$codes, initial_dims = ncol(fsom$map$codes),
+                           dims = 2, check_duplicates = FALSE, pca = F, perplexity=30,max_iter=2000)$Y
+      #  fsom$MST$l2 <- tsne(fsom$map$codes)   
         #library(RDRToolbox)
         #fsom$MST$l2 <- Isomap(fsom$map$codes,dims=2,k=3)[[1]]
     }
     
     UpdateNodeSize(fsom)
 }
+
+
+UpdateMST<-function(fsom,gexfname){
+  
+          library(rgexf)
+          mygexf<-read.gexf(gexfname)
+          fsom$MST$l<-as.matrix(mygexf$nodesVizAtt$position[,c(1,2)])
+          fsom$MST$graph<-gexf.to.igraph(mygexf)
+          fsom
+         }
+
+# 
+# 
+# fSOM<-UpdateNodeSize(fsom)
+# #install.packages("intergraph")
+# library(intergraph)
+# 
+# # as.matrix(fsom$MST$graph,"edgelist")
+# # eddf<-as.matrix(fsom$MST$graph, matrix.type = c("edgelist"))
+# # write.csv(eddf,file = "eddf.csv")
+# #           
+# #           data(exIgraph)
+# #           as.matrix(exIgraph, "adjacency")
+# #           as.matrix(exIgraph, "edgelist")
+# #           # use edge attribute "label"
+# #           as.matrix(exIgraph, "adjacency", sparse=FALSE, attr="label")
+# #           
+# # str(eddf[101])          
+#           
+# plot(fsom$MST$l)
+# 
+# as_edgelist(fsom$MST$graph, names = TRUE)
+# 
+# read.table("outputxy3.net")
+# install.packages("rgexf")
+# library(rgexf)
+# inputgexf<-read.gexf("outputxy2.gexf")
+# 
+# gexf.to.igraph(inputgexf)
+# outputgexf<-igraph.to.gexf(fsom$MST$graph)
+# 
+# write.gexf(edges=as_edgelist(fsom$MST$graph, names = TRUE))
+# 
+# write.gexf(outputgexf,output="outputgexf.gexf")
+# 
+# mygexf<-read.gexf("gout_gexf.gexf")
+# 
+# 
+# fsom$MST$l<-as.matrix(mygexf$nodesVizAtt$position[,c(1,2)])
+# 
+# fsom$MST$graph<-gexf.to.igraph(read.gexf("gout_gexf.gexf"))
+# 
+
+
 
 ####################
 ## UpdateNodeSize ##
@@ -88,8 +158,12 @@ BuildMST <- function(fsom, silent=FALSE, tSNE=FALSE){
 #' PlotStars(flowSOM.res)
 #' 
 #' @export
+#' 
+#' 
+
 UpdateNodeSize <- function(fsom, count = NULL, reset=FALSE, transform=sqrt,
                             maxNodeSize = 15,
+                            minNodeSize = 3, 
                             shift = 0, scale = NULL){
     if(reset){
         fsom$MST$size <- rep(maxNodeSize, nrow(fsom$map$grid))
@@ -109,7 +183,9 @@ UpdateNodeSize <- function(fsom, count = NULL, reset=FALSE, transform=sqrt,
         
         if(is.null(shift)) shift <- min(t)
         if(is.null(scale)) scale <- max(t - shift)
-        rescaled <- maxNodeSize * (t - shift)/scale
+        
+        
+        rescaled <- (maxNodeSize-minNodeSize) * (t - shift)/scale+minNodeSize
         rescaled[rescaled == 0] <- 0.0001
         fsom$MST$size <- rescaled   
     }
@@ -1195,7 +1271,7 @@ PlotStars <- function(fsom,
                 res
             }))
     }
-    
+  
     # Choose layout type
     switch(view,
         MST  = { layout <- fsom$MST$l 
@@ -1688,9 +1764,8 @@ PlotOverview2D <- function(fsom,
   graphics::layout(matrix(seq_len(length(markerlist) * length(metaclusters)), 
                 nrow = length(metaclusters)))
   if(is.null(colors)){
-    colors <- RColorBrewer::brewer.pal(12,
+    colors <- RColorBrewer::brewer.pal(length(metaclusters),
                                        "Paired")
-    colors <- rep(colors, length.out = length(metaclusters))
     names(colors) <- as.character(metaclusters)
   }
   
